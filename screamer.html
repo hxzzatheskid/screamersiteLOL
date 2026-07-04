@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENTER THE GAME</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            background: #0a0a0a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Arial Black', 'Impact', sans-serif;
+            overflow: hidden;
+            transition: background 0.1s;
+        }
+        #gameScreen {
+            text-align: center;
+            cursor: pointer;
+            z-index: 10;
+            position: relative;
+        }
+        #gameScreen h1 {
+            font-size: 6rem;
+            color: #0ff;
+            text-shadow: 0 0 20px #0ff, 0 0 40px #0ff, 0 0 80px #00f;
+            animation: pulse 1.5s ease-in-out infinite;
+            letter-spacing: 8px;
+            transition: 0.3s;
+        }
+        #gameScreen h1:hover {
+            color: #f0f;
+            text-shadow: 0 0 20px #f0f, 0 0 40px #f0f, 0 0 80px #f0f;
+            transform: scale(1.05);
+        }
+        #gameScreen p {
+            color: #aaa;
+            font-size: 1.5rem;
+            margin-top: 20px;
+            letter-spacing: 4px;
+            font-family: 'Courier New', monospace;
+            animation: flicker 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.08); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.9; }
+        }
+        @keyframes flicker {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+        #scaryContent {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            background: black;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        #scaryContent img {
+            max-width: 100vw;
+            max-height: 100vh;
+            object-fit: cover;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #overlayText {
+            position: absolute;
+            z-index: 2;
+            color: white;
+            font-size: 4rem;
+            font-weight: 900;
+            text-align: center;
+            text-shadow: 0 0 30px red, 0 0 60px red, 0 0 120px red;
+            background: rgba(0,0,0,0.4);
+            padding: 20px 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+            border: 4px solid red;
+            font-family: 'Arial Black', sans-serif;
+            animation: shake 0.3s infinite alternate;
+            pointer-events: none;
+        }
+        #ipDisplay {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            z-index: 3;
+            color: #ff0;
+            font-size: 2.5rem;
+            background: rgba(0,0,0,0.7);
+            padding: 15px 30px;
+            border-radius: 12px;
+            border: 2px solid #ff0;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+            text-shadow: 0 0 20px #ff0;
+            pointer-events: none;
+        }
+        @keyframes shake {
+            0% { transform: translate(-5px, -5px) rotate(-1deg); }
+            100% { transform: translate(5px, 5px) rotate(1deg); }
+        }
+        .rainbow {
+            animation: rainbowFlash 0.1s infinite alternate;
+        }
+        @keyframes rainbowFlash {
+            0% { background-color: red; }
+            12% { background-color: orange; }
+            25% { background-color: yellow; }
+            37% { background-color: green; }
+            50% { background-color: cyan; }
+            62% { background-color: blue; }
+            75% { background-color: purple; }
+            87% { background-color: magenta; }
+            100% { background-color: red; }
+        }
+        /* hide scrollbar */
+        ::-webkit-scrollbar { display: none; }
+        body { -ms-overflow-style: none; scrollbar-width: none; }
+        /* responsive */
+        @media (max-width: 768px) {
+            #gameScreen h1 { font-size: 3.5rem; }
+            #overlayText { font-size: 2.5rem; padding: 15px 20px; }
+            #ipDisplay { font-size: 1.5rem; bottom: 20px; right: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="gameScreen">
+        <h1>🎮 ENTER THE GAME!</h1>
+        <p>click anywhere to begin your journey</p>
+    </div>
+
+    <div id="scaryContent">
+        <img id="scaryImage" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRidsvRX5V1092HP11qY6LYQcv2ogY2QRefbMYRWDrN_A&s" alt="scary">
+        <div id="overlayText">⚠️ I'M GOING TO FIND YOU ⚠️</div>
+        <div id="ipDisplay">🌐 YOUR IP: <span id="ipValue">...</span></div>
+    </div>
+
+    <audio id="screamSound" preload="auto">
+        <source src="https://www.myinstants.com/media/sounds/wilhelm-scream.mp3" type="audio/mpeg">
+        <!-- fallback scream using Web Audio if mp3 fails -->
+    </audio>
+
+    <script>
+        (function() {
+            const gameScreen = document.getElementById('gameScreen');
+            const scaryContent = document.getElementById('scaryContent');
+            const scaryImage = document.getElementById('scaryImage');
+            const overlayText = document.getElementById('overlayText');
+            const ipDisplay = document.getElementById('ipDisplay');
+            const ipValue = document.getElementById('ipValue');
+            const screamAudio = document.getElementById('screamSound');
+
+            // Preload image
+            const img = new Image();
+            img.src = scaryImage.src;
+
+            // Function to play scream with fallback
+            function playScream() {
+                // Try to play the audio element
+                screamAudio.volume = 1.0;
+                screamAudio.loop = false;
+                screamAudio.play().catch(function(e) {
+                    console.warn('Audio play failed, using Web Audio fallback');
+                    // Fallback: generate a harsh screech using Web Audio API
+                    try {
+                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioCtx.createOscillator();
+                        const gainNode = audioCtx.createGain();
+                        oscillator.type = 'sawtooth';
+                        oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(3000, audioCtx.currentTime + 0.2);
+                        gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioCtx.destination);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + 1.5);
+                    } catch (err) {
+                        console.warn('Web Audio fallback also failed');
+                    }
+                });
+                // Also try to play multiple times for loudness
+                setTimeout(() => {
+                    screamAudio.currentTime = 0;
+                    screamAudio.play().catch(() => {});
+                }, 200);
+                setTimeout(() => {
+                    screamAudio.currentTime = 0;
+                    screamAudio.play().catch(() => {});
+                }, 400);
+            }
+
+            // Function to get IP and display
+            function fetchIP() {
+                fetch('https://api.ipify.org?format=json')
+                    .then(response => response.json())
+                    .then(data => {
+                        ipValue.textContent = data.ip || 'UNKNOWN';
+                    })
+                    .catch(() => {
+                        // fallback: try another service or show local
+                        fetch('https://ipapi.co/json/')
+                            .then(res => res.json())
+                            .then(data => {
+                                ipValue.textContent = data.ip || 'UNKNOWN';
+                            })
+                            .catch(() => {
+                                ipValue.textContent = '127.0.0.1 (local)';
+                            });
+                    });
+            }
+
+            // Function to start rainbow flash on body
+            function startRainbow() {
+                document.body.classList.add('rainbow');
+                // Also apply to scaryContent background
+                scaryContent.style.background = 'transparent';
+                // But we want the flash to affect the whole screen, so we set body background to flash
+                // Already done by class
+                // Make sure scaryContent background is transparent so body shows through
+                scaryContent.style.backgroundColor = 'transparent';
+                // Also apply to image? not needed
+            }
+
+            // Function to handle the click and trigger the scary stuff
+            function activateScary() {
+                // Request fullscreen
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                } else if (document.documentElement.webkitRequestFullscreen) {
+                    document.documentElement.webkitRequestFullscreen();
+                } else if (document.documentElement.msRequestFullscreen) {
+                    document.documentElement.msRequestFullscreen();
+                }
+
+                // Hide game screen, show scary content
+                gameScreen.style.display = 'none';
+                scaryContent.style.display = 'flex';
+
+                // Play scream
+                playScream();
+
+                // Start rainbow
+                startRainbow();
+
+                // Fetch IP and display
+                fetchIP();
+
+                // Also after 3 seconds, re-play scream for effect
+                setTimeout(() => {
+                    playScream();
+                }, 3000);
+                setTimeout(() => {
+                    playScream();
+                }, 6000);
+
+                // Add a little extra: flash the overlay text
+                setInterval(() => {
+                    overlayText.style.color = ['red', 'yellow', 'lime', 'cyan', 'magenta', 'white'][Math.floor(Math.random() * 6)];
+                }, 200);
+            }
+
+            // Event listeners
+            gameScreen.addEventListener('click', activateScary);
+            // Also if user clicks on scary content, do nothing (it's already active)
+
+            // For mobile touch
+            gameScreen.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                activateScary();
+            });
+
+            // If the image fails to load, show a fallback
+            scaryImage.onerror = function() {
+                this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100%25" height="100%25" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="red"/%3E%3Ctext x="50" y="50" font-size="20" fill="white" text-anchor="middle" dy=".3em" font-family="monospace" font-weight="bold"%3ESCARED%3C/text%3E%3C/svg%3E';
+            };
+
+            console.log('Screamer site ready - click to enter the game!');
+        })();
+    </script>
+</body>
+</html>
