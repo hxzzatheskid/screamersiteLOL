@@ -19,7 +19,7 @@
             height: 100vh;
             font-family: 'Arial Black', 'Impact', sans-serif;
             overflow: hidden;
-            transition: background 0.1s;
+            transition: background 0.05s;
         }
         #gameScreen {
             text-align: center;
@@ -80,46 +80,33 @@
             top: 0;
             left: 0;
             z-index: 1;
-        }
-        #overlayText {
-            position: absolute;
-            z-index: 2;
-            color: white;
-            font-size: 4rem;
-            font-weight: 900;
-            text-align: center;
-            text-shadow: 0 0 30px red, 0 0 60px red, 0 0 120px red;
-            background: rgba(0,0,0,0.4);
-            padding: 20px 40px;
-            border-radius: 20px;
-            backdrop-filter: blur(4px);
-            border: 4px solid red;
-            font-family: 'Arial Black', sans-serif;
-            animation: shake 0.3s infinite alternate;
-            pointer-events: none;
+            /* Rapid flash animation will be applied via JS to be more aggressive */
         }
         #ipDisplay {
             position: absolute;
-            bottom: 40px;
-            right: 40px;
             z-index: 3;
             color: #ff0;
-            font-size: 2.5rem;
-            background: rgba(0,0,0,0.7);
-            padding: 15px 30px;
-            border-radius: 12px;
-            border: 2px solid #ff0;
+            font-size: 6rem;
+            font-weight: 900;
+            text-align: center;
+            background: rgba(0,0,0,0.6);
+            padding: 30px 50px;
+            border-radius: 20px;
+            border: 4px solid #ff0;
             font-family: 'Courier New', monospace;
-            letter-spacing: 2px;
-            text-shadow: 0 0 20px #ff0;
+            letter-spacing: 4px;
+            text-shadow: 0 0 30px #ff0, 0 0 60px #ff0, 0 0 120px #ff0;
+            box-shadow: 0 0 50px rgba(255,255,0,0.3);
+            backdrop-filter: blur(8px);
             pointer-events: none;
+            animation: ipPulse 0.3s infinite alternate;
         }
-        @keyframes shake {
-            0% { transform: translate(-5px, -5px) rotate(-1deg); }
-            100% { transform: translate(5px, 5px) rotate(1deg); }
+        @keyframes ipPulse {
+            0% { transform: scale(1); text-shadow: 0 0 20px #ff0; }
+            100% { transform: scale(1.05); text-shadow: 0 0 60px #ff0, 0 0 100px #ff0; }
         }
         .rainbow {
-            animation: rainbowFlash 0.1s infinite alternate;
+            animation: rainbowFlash 0.05s infinite alternate !important;
         }
         @keyframes rainbowFlash {
             0% { background-color: red; }
@@ -132,14 +119,21 @@
             87% { background-color: magenta; }
             100% { background-color: red; }
         }
-        /* hide scrollbar */
+        /* Rapid image flash - stroboscope effect */
+        .flash-image {
+            animation: imageStrobe 0.05s infinite alternate !important;
+        }
+        @keyframes imageStrobe {
+            0% { opacity: 1; filter: brightness(1) contrast(1); }
+            50% { opacity: 0.3; filter: brightness(3) contrast(2); }
+            100% { opacity: 1; filter: brightness(0.5) contrast(0.5); }
+        }
+        /* Hide scrollbar */
         ::-webkit-scrollbar { display: none; }
         body { -ms-overflow-style: none; scrollbar-width: none; }
-        /* responsive */
         @media (max-width: 768px) {
             #gameScreen h1 { font-size: 3.5rem; }
-            #overlayText { font-size: 2.5rem; padding: 15px 20px; }
-            #ipDisplay { font-size: 1.5rem; bottom: 20px; right: 20px; }
+            #ipDisplay { font-size: 3rem; padding: 20px 30px; }
         }
     </style>
 </head>
@@ -152,13 +146,13 @@
 
     <div id="scaryContent">
         <img id="scaryImage" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRidsvRX5V1092HP11qY6LYQcv2ogY2QRefbMYRWDrN_A&s" alt="scary">
-        <div id="overlayText">⚠️ I'M GOING TO FIND YOU ⚠️</div>
         <div id="ipDisplay">🌐 YOUR IP: <span id="ipValue">...</span></div>
     </div>
 
-    <audio id="screamSound" preload="auto">
+    <audio id="screamSound" preload="auto" crossorigin="anonymous">
         <source src="https://www.myinstants.com/media/sounds/wilhelm-scream.mp3" type="audio/mpeg">
-        <!-- fallback scream using Web Audio if mp3 fails -->
+        <!-- Additional fallback sources -->
+        <source src="https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0c0c1f3f1.mp3?filename=horror-scream-01-10753.mp3" type="audio/mpeg">
     </audio>
 
     <script>
@@ -166,7 +160,6 @@
             const gameScreen = document.getElementById('gameScreen');
             const scaryContent = document.getElementById('scaryContent');
             const scaryImage = document.getElementById('scaryImage');
-            const overlayText = document.getElementById('overlayText');
             const ipDisplay = document.getElementById('ipDisplay');
             const ipValue = document.getElementById('ipValue');
             const screamAudio = document.getElementById('screamSound');
@@ -175,43 +168,92 @@
             const img = new Image();
             img.src = scaryImage.src;
 
-            // Function to play scream with fallback
-            function playScream() {
-                // Try to play the audio element
+            // ========== LOUD SCREAM ENGINE ==========
+            function playLoudScream() {
+                // 1. Try the audio element with volume maxed
                 screamAudio.volume = 1.0;
+                screamAudio.currentTime = 0;
                 screamAudio.loop = false;
-                screamAudio.play().catch(function(e) {
-                    console.warn('Audio play failed, using Web Audio fallback');
-                    // Fallback: generate a harsh screech using Web Audio API
-                    try {
-                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                        const oscillator = audioCtx.createOscillator();
-                        const gainNode = audioCtx.createGain();
-                        oscillator.type = 'sawtooth';
-                        oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
-                        oscillator.frequency.exponentialRampToValueAtTime(3000, audioCtx.currentTime + 0.2);
-                        gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
-                        oscillator.connect(gainNode);
-                        gainNode.connect(audioCtx.destination);
-                        oscillator.start();
-                        oscillator.stop(audioCtx.currentTime + 1.5);
-                    } catch (err) {
-                        console.warn('Web Audio fallback also failed');
+                screamAudio.play().catch(() => {});
+
+                // 2. Play multiple overlapping instances for loudness and distortion
+                for (let i = 0; i < 3; i++) {
+                    setTimeout(() => {
+                        const clone = screamAudio.cloneNode(true);
+                        clone.volume = 1.0;
+                        clone.currentTime = 0;
+                        clone.play().catch(() => {});
+                    }, i * 100);
+                }
+
+                // 3. Aggressive Web Audio fallback – high gain, distortion, frequency sweep
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    const distortion = audioCtx.createWaveShaper();
+                    
+                    // Distortion curve (simple clipper)
+                    function makeDistortionCurve(amount) {
+                        const k = typeof amount === 'number' ? amount : 50;
+                        const samples = 44100;
+                        const curve = new Float32Array(samples);
+                        const deg = Math.PI / 180;
+                        for (let i = 0; i < samples; ++i) {
+                            const x = (i * 2) / samples - 1;
+                            curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+                        }
+                        return curve;
                     }
-                });
-                // Also try to play multiple times for loudness
+                    distortion.curve = makeDistortionCurve(100);
+                    distortion.oversample = '4x';
+
+                    oscillator.type = 'sawtooth';
+                    oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(8000, audioCtx.currentTime + 0.3);
+                    oscillator.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.8);
+                    
+                    gainNode.gain.setValueAtTime(0.8, audioCtx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2.0);
+
+                    oscillator.connect(distortion);
+                    distortion.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.start();
+                    oscillator.stop(audioCtx.currentTime + 2.0);
+
+                    // Also add a second oscillator for chaos
+                    const osc2 = audioCtx.createOscillator();
+                    const gain2 = audioCtx.createGain();
+                    osc2.type = 'square';
+                    osc2.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    osc2.frequency.exponentialRampToValueAtTime(6000, audioCtx.currentTime + 0.5);
+                    gain2.gain.setValueAtTime(0.6, audioCtx.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.8);
+                    osc2.connect(gain2);
+                    gain2.connect(audioCtx.destination);
+                    osc2.start();
+                    osc2.stop(audioCtx.currentTime + 1.8);
+                } catch (e) {
+                    console.warn('Web Audio fallback failed:', e);
+                }
+
+                // 4. Repeated bursts
                 setTimeout(() => {
                     screamAudio.currentTime = 0;
                     screamAudio.play().catch(() => {});
-                }, 200);
+                }, 500);
                 setTimeout(() => {
                     screamAudio.currentTime = 0;
                     screamAudio.play().catch(() => {});
-                }, 400);
+                }, 1000);
+                setTimeout(() => {
+                    screamAudio.currentTime = 0;
+                    screamAudio.play().catch(() => {});
+                }, 1500);
             }
 
-            // Function to get IP and display
+            // ========== FETCH IP ==========
             function fetchIP() {
                 fetch('https://api.ipify.org?format=json')
                     .then(response => response.json())
@@ -219,7 +261,6 @@
                         ipValue.textContent = data.ip || 'UNKNOWN';
                     })
                     .catch(() => {
-                        // fallback: try another service or show local
                         fetch('https://ipapi.co/json/')
                             .then(res => res.json())
                             .then(data => {
@@ -231,21 +272,27 @@
                     });
             }
 
-            // Function to start rainbow flash on body
-            function startRainbow() {
+            // ========== RAPID IMAGE FLASH ==========
+            function startImageFlash() {
+                // Apply class with rapid strobe animation
+                scaryImage.classList.add('flash-image');
+                // Also apply to body for full screen flash
                 document.body.classList.add('rainbow');
-                // Also apply to scaryContent background
-                scaryContent.style.background = 'transparent';
-                // But we want the flash to affect the whole screen, so we set body background to flash
-                // Already done by class
-                // Make sure scaryContent background is transparent so body shows through
+                // Make scaryContent background transparent so body flash shows
                 scaryContent.style.backgroundColor = 'transparent';
-                // Also apply to image? not needed
+                // Also flash the IP display border
+                ipDisplay.style.animation = 'ipPulse 0.1s infinite alternate';
+                // Rapid change image filter
+                setInterval(() => {
+                    const bright = Math.random() * 3 + 0.2;
+                    const contrast = Math.random() * 3 + 0.2;
+                    scaryImage.style.filter = `brightness(${bright}) contrast(${contrast})`;
+                }, 80);
             }
 
-            // Function to handle the click and trigger the scary stuff
+            // ========== ACTIVATE SCARY ==========
             function activateScary() {
-                // Request fullscreen
+                // Fullscreen
                 if (document.documentElement.requestFullscreen) {
                     document.documentElement.requestFullscreen().catch(() => {});
                 } else if (document.documentElement.webkitRequestFullscreen) {
@@ -254,49 +301,43 @@
                     document.documentElement.msRequestFullscreen();
                 }
 
-                // Hide game screen, show scary content
+                // Hide game, show scary
                 gameScreen.style.display = 'none';
                 scaryContent.style.display = 'flex';
 
-                // Play scream
-                playScream();
+                // Play loud scream
+                playLoudScream();
 
-                // Start rainbow
-                startRainbow();
+                // Start rapid image flash
+                startImageFlash();
 
-                // Fetch IP and display
+                // Fetch and display IP
                 fetchIP();
 
-                // Also after 3 seconds, re-play scream for effect
-                setTimeout(() => {
-                    playScream();
-                }, 3000);
-                setTimeout(() => {
-                    playScream();
-                }, 6000);
-
-                // Add a little extra: flash the overlay text
+                // Continuously re-trigger scream every few seconds for maximum annoyance
                 setInterval(() => {
-                    overlayText.style.color = ['red', 'yellow', 'lime', 'cyan', 'magenta', 'white'][Math.floor(Math.random() * 6)];
-                }, 200);
+                    playLoudScream();
+                }, 3500);
+
+                // Also flash the IP text color
+                setInterval(() => {
+                    ipDisplay.style.color = ['#ff0', '#f00', '#0f0', '#00f', '#f0f', '#0ff'][Math.floor(Math.random() * 6)];
+                }, 100);
             }
 
-            // Event listeners
+            // ========== EVENT LISTENERS ==========
             gameScreen.addEventListener('click', activateScary);
-            // Also if user clicks on scary content, do nothing (it's already active)
-
-            // For mobile touch
             gameScreen.addEventListener('touchstart', function(e) {
                 e.preventDefault();
                 activateScary();
             });
 
-            // If the image fails to load, show a fallback
+            // Fallback if image fails
             scaryImage.onerror = function() {
                 this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100%25" height="100%25" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="red"/%3E%3Ctext x="50" y="50" font-size="20" fill="white" text-anchor="middle" dy=".3em" font-family="monospace" font-weight="bold"%3ESCARED%3C/text%3E%3C/svg%3E';
             };
 
-            console.log('Screamer site ready - click to enter the game!');
+            console.log('Enhanced screamer ready - click to enter!');
         })();
     </script>
 </body>
