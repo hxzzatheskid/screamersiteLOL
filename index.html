@@ -80,33 +80,33 @@
             top: 0;
             left: 0;
             z-index: 1;
-            /* Rapid flash animation will be applied via JS to be more aggressive */
         }
         #ipDisplay {
             position: absolute;
             z-index: 3;
-            color: #ff0;
-            font-size: 6rem;
-            font-weight: 900;
+            color: rgba(255, 255, 255, 0.2);
+            font-size: 1.0rem;
+            font-weight: 300;
             text-align: center;
-            background: rgba(0,0,0,0.6);
-            padding: 30px 50px;
-            border-radius: 20px;
-            border: 4px solid #ff0;
+            background: rgba(0,0,0,0.03);
+            padding: 4px 12px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.02);
             font-family: 'Courier New', monospace;
-            letter-spacing: 4px;
-            text-shadow: 0 0 30px #ff0, 0 0 60px #ff0, 0 0 120px #ff0;
-            box-shadow: 0 0 50px rgba(255,255,0,0.3);
-            backdrop-filter: blur(8px);
+            letter-spacing: 1px;
+            text-shadow: 0 0 6px rgba(255,255,255,0.03);
+            backdrop-filter: blur(1px);
             pointer-events: none;
-            animation: ipPulse 0.3s infinite alternate;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
         }
-        @keyframes ipPulse {
-            0% { transform: scale(1); text-shadow: 0 0 20px #ff0; }
-            100% { transform: scale(1.05); text-shadow: 0 0 60px #ff0, 0 0 100px #ff0; }
+        #ipDisplay span {
+            opacity: 0.4;
         }
         .rainbow {
-            animation: rainbowFlash 0.05s infinite alternate !important;
+            animation: rainbowFlash 0.04s infinite alternate !important;
         }
         @keyframes rainbowFlash {
             0% { background-color: red; }
@@ -119,21 +119,19 @@
             87% { background-color: magenta; }
             100% { background-color: red; }
         }
-        /* Rapid image flash - stroboscope effect */
         .flash-image {
-            animation: imageStrobe 0.05s infinite alternate !important;
+            animation: imageStrobe 0.03s infinite alternate !important;
         }
         @keyframes imageStrobe {
             0% { opacity: 1; filter: brightness(1) contrast(1); }
-            50% { opacity: 0.3; filter: brightness(3) contrast(2); }
-            100% { opacity: 1; filter: brightness(0.5) contrast(0.5); }
+            50% { opacity: 0.1; filter: brightness(6) contrast(5); }
+            100% { opacity: 1; filter: brightness(0.3) contrast(0.3); }
         }
-        /* Hide scrollbar */
         ::-webkit-scrollbar { display: none; }
         body { -ms-overflow-style: none; scrollbar-width: none; }
         @media (max-width: 768px) {
             #gameScreen h1 { font-size: 3.5rem; }
-            #ipDisplay { font-size: 3rem; padding: 20px 30px; }
+            #ipDisplay { font-size: 0.7rem; padding: 2px 8px; }
         }
     </style>
 </head>
@@ -146,13 +144,13 @@
 
     <div id="scaryContent">
         <img id="scaryImage" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRidsvRX5V1092HP11qY6LYQcv2ogY2QRefbMYRWDrN_A&s" alt="scary">
-        <div id="ipDisplay">🌐 YOUR IP: <span id="ipValue">...</span></div>
+        <div id="ipDisplay">🌐 <span id="ipValue">...</span></div>
     </div>
 
+    <!-- Primary scream: Jeff the Killer from myinstants -->
     <audio id="screamSound" preload="auto" crossorigin="anonymous">
-        <source src="https://www.myinstants.com/media/sounds/wilhelm-scream.mp3" type="audio/mpeg">
-        <!-- Additional fallback sources -->
-        <source src="https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0c0c1f3f1.mp3?filename=horror-scream-01-10753.mp3" type="audio/mpeg">
+        <source src="https://www.myinstants.com/media/sounds/jeff-the-killer-screaming.mp3" type="audio/mpeg">
+        <!-- Fallback to synthesized scream via Web Audio (included in JS) -->
     </audio>
 
     <script>
@@ -168,32 +166,16 @@
             const img = new Image();
             img.src = scaryImage.src;
 
-            // ========== LOUD SCREAM ENGINE ==========
-            function playLoudScream() {
-                // 1. Try the audio element with volume maxed
-                screamAudio.volume = 1.0;
-                screamAudio.currentTime = 0;
-                screamAudio.loop = false;
-                screamAudio.play().catch(() => {});
-
-                // 2. Play multiple overlapping instances for loudness and distortion
-                for (let i = 0; i < 3; i++) {
-                    setTimeout(() => {
-                        const clone = screamAudio.cloneNode(true);
-                        clone.volume = 1.0;
-                        clone.currentTime = 0;
-                        clone.play().catch(() => {});
-                    }, i * 100);
-                }
-
-                // 3. Aggressive Web Audio fallback – high gain, distortion, frequency sweep
+            // ========== SYNTHESIZED FALLBACK SCREAM (if MP3 fails) ==========
+            function playSynthesizedScream() {
                 try {
                     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = audioCtx.createOscillator();
-                    const gainNode = audioCtx.createGain();
+                    
+                    // Main scream oscillator (sawtooth sweep with distortion)
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
                     const distortion = audioCtx.createWaveShaper();
                     
-                    // Distortion curve (simple clipper)
                     function makeDistortionCurve(amount) {
                         const k = typeof amount === 'number' ? amount : 50;
                         const samples = 44100;
@@ -205,52 +187,89 @@
                         }
                         return curve;
                     }
-                    distortion.curve = makeDistortionCurve(100);
+                    distortion.curve = makeDistortionCurve(150);
                     distortion.oversample = '4x';
 
-                    oscillator.type = 'sawtooth';
-                    oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
-                    oscillator.frequency.exponentialRampToValueAtTime(8000, audioCtx.currentTime + 0.3);
-                    oscillator.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.8);
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(2200, audioCtx.currentTime + 0.4);
+                    osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.8);
+                    osc.frequency.exponentialRampToValueAtTime(3500, audioCtx.currentTime + 1.3);
+                    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 1.8);
                     
-                    gainNode.gain.setValueAtTime(0.8, audioCtx.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2.0);
+                    gain.gain.setValueAtTime(0.9, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2.5);
 
-                    oscillator.connect(distortion);
-                    distortion.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
-                    oscillator.start();
-                    oscillator.stop(audioCtx.currentTime + 2.0);
+                    osc.connect(distortion);
+                    distortion.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 2.5);
 
-                    // Also add a second oscillator for chaos
+                    // High-pitched squeal
                     const osc2 = audioCtx.createOscillator();
                     const gain2 = audioCtx.createGain();
                     osc2.type = 'square';
-                    osc2.frequency.setValueAtTime(400, audioCtx.currentTime);
-                    osc2.frequency.exponentialRampToValueAtTime(6000, audioCtx.currentTime + 0.5);
-                    gain2.gain.setValueAtTime(0.6, audioCtx.currentTime);
-                    gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.8);
+                    osc2.frequency.setValueAtTime(900, audioCtx.currentTime);
+                    osc2.frequency.exponentialRampToValueAtTime(6000, audioCtx.currentTime + 0.3);
+                    osc2.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.7);
+                    osc2.frequency.exponentialRampToValueAtTime(4500, audioCtx.currentTime + 1.1);
+                    gain2.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5);
                     osc2.connect(gain2);
                     gain2.connect(audioCtx.destination);
                     osc2.start();
-                    osc2.stop(audioCtx.currentTime + 1.8);
+                    osc2.stop(audioCtx.currentTime + 1.5);
+
+                    // Noise burst
+                    const bufferSize = audioCtx.sampleRate * 0.5;
+                    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / bufferSize * 2.5);
+                    }
+                    const noise = audioCtx.createBufferSource();
+                    noise.buffer = buffer;
+                    const noiseGain = audioCtx.createGain();
+                    noiseGain.gain.setValueAtTime(0.7, audioCtx.currentTime);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                    noise.connect(noiseGain);
+                    noiseGain.connect(audioCtx.destination);
+                    noise.start();
+                    noise.stop(audioCtx.currentTime + 0.5);
+
                 } catch (e) {
-                    console.warn('Web Audio fallback failed:', e);
+                    console.warn('Web Audio synthesis failed:', e);
+                }
+            }
+
+            // ========== PRIMARY SCREAM FUNCTION ==========
+            function playScream() {
+                // 1. Play the MP3 (if available)
+                screamAudio.volume = 1.0;
+                screamAudio.currentTime = 0;
+                const playPromise = screamAudio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => {
+                        // If MP3 fails, use synthesized fallback
+                        playSynthesizedScream();
+                    });
                 }
 
-                // 4. Repeated bursts
-                setTimeout(() => {
-                    screamAudio.currentTime = 0;
-                    screamAudio.play().catch(() => {});
-                }, 500);
-                setTimeout(() => {
-                    screamAudio.currentTime = 0;
-                    screamAudio.play().catch(() => {});
-                }, 1000);
-                setTimeout(() => {
-                    screamAudio.currentTime = 0;
-                    screamAudio.play().catch(() => {});
-                }, 1500);
+                // 2. Also play synthesized for extra layering and volume
+                playSynthesizedScream();
+
+                // 3. Overlap multiple clones for loudness
+                for (let i = 0; i < 3; i++) {
+                    setTimeout(() => {
+                        const clone = screamAudio.cloneNode(true);
+                        clone.volume = 1.0;
+                        clone.currentTime = 0;
+                        clone.play().catch(() => {});
+                        // Re-trigger synthesis as well
+                        playSynthesizedScream();
+                    }, i * 100);
+                }
             }
 
             // ========== FETCH IP ==========
@@ -267,27 +286,20 @@
                                 ipValue.textContent = data.ip || 'UNKNOWN';
                             })
                             .catch(() => {
-                                ipValue.textContent = '127.0.0.1 (local)';
+                                ipValue.textContent = '127.0.0.1';
                             });
                     });
             }
 
             // ========== RAPID IMAGE FLASH ==========
             function startImageFlash() {
-                // Apply class with rapid strobe animation
                 scaryImage.classList.add('flash-image');
-                // Also apply to body for full screen flash
                 document.body.classList.add('rainbow');
-                // Make scaryContent background transparent so body flash shows
                 scaryContent.style.backgroundColor = 'transparent';
-                // Also flash the IP display border
-                ipDisplay.style.animation = 'ipPulse 0.1s infinite alternate';
-                // Rapid change image filter
+                // Randomize IP opacity for subtle flicker
                 setInterval(() => {
-                    const bright = Math.random() * 3 + 0.2;
-                    const contrast = Math.random() * 3 + 0.2;
-                    scaryImage.style.filter = `brightness(${bright}) contrast(${contrast})`;
-                }, 80);
+                    ipDisplay.style.opacity = 0.05 + Math.random() * 0.4;
+                }, 30);
             }
 
             // ========== ACTIVATE SCARY ==========
@@ -301,28 +313,17 @@
                     document.documentElement.msRequestFullscreen();
                 }
 
-                // Hide game, show scary
                 gameScreen.style.display = 'none';
                 scaryContent.style.display = 'flex';
 
-                // Play loud scream
-                playLoudScream();
-
-                // Start rapid image flash
+                playScream();
                 startImageFlash();
-
-                // Fetch and display IP
                 fetchIP();
 
-                // Continuously re-trigger scream every few seconds for maximum annoyance
+                // Repeat scream every few seconds
                 setInterval(() => {
-                    playLoudScream();
-                }, 3500);
-
-                // Also flash the IP text color
-                setInterval(() => {
-                    ipDisplay.style.color = ['#ff0', '#f00', '#0f0', '#00f', '#f0f', '#0ff'][Math.floor(Math.random() * 6)];
-                }, 100);
+                    playScream();
+                }, 2500);
             }
 
             // ========== EVENT LISTENERS ==========
@@ -332,12 +333,11 @@
                 activateScary();
             });
 
-            // Fallback if image fails
             scaryImage.onerror = function() {
                 this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100%25" height="100%25" viewBox="0 0 100 100"%3E%3Crect width="100" height="100" fill="red"/%3E%3Ctext x="50" y="50" font-size="20" fill="white" text-anchor="middle" dy=".3em" font-family="monospace" font-weight="bold"%3ESCARED%3C/text%3E%3C/svg%3E';
             };
 
-            console.log('Enhanced screamer ready - click to enter!');
+            console.log('Jeff the Killer scream loaded successfully!');
         })();
     </script>
 </body>
